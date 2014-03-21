@@ -29,14 +29,17 @@ getFreshCopies = (callback) ->
                     console.log "INFO".grey, "fetching done"
                     callback()
 
-parseJSON = (data) ->
+parseJSON = (data, player) ->
     try
         config = JSON.parse data
     catch error
-        console.log "ERROR".red, "Invalid JSON"
+        console.log "ERROR".red, "Invalid JSON, player", player
         console.log data
         process.exit 1
     config
+
+who = (num) ->
+    if num is 0 then "<your bot>".green else "<training bot>".blue
 
 simulate = ->
 
@@ -52,34 +55,39 @@ simulate = ->
         answer
 
     bots = ["coffee #{path_battleships_bot}", "chmod +x ./run.sh && ./run.sh"]
+    
+    config0 = parseJSON runBot(bots[0]), "local"
+    config1 = parseJSON runBot(bots[1]), "random"
 
-    config0 = parseJSON runBot(bots[0])
-    config1 = parseJSON runBot(bots[1])
-
-    if not game.setup(config0, config1)
+    error = game.setup(config0, config1)
+    if error
         console.log "ERROR".red, "Invalid config"
-        console.log "Player #{game.winner()}:".yellow
-        console.log configs[game.winner()]
+        console.log "Bot #{who(game.player())}".yellow
+        console.log error
         process.exit 1
 
-    gameLoop = ->
+    while not game.over()
 
-        if game.over()
-            console.log "Game over! Winner: #{game.winner()}"
-            game.debugPrint()
-            process.exit 0
-        else
-            data = runBot bots[game.player()]
-            move = JSON.parse data
+        game._print()
 
-            who = if game.player() is 0 then "local".green else "random".blue
-            console.log "Bot", who, "plays: #{data}"
+        data = runBot bots[game.player()]
+        move = parseJSON data, who
 
-            game.play move
+        bot = who(game.player())
+        console.log "Bot #{bot} plays: #{data}"
 
-            gameLoop()
+        error = game.play move
+        if error
+            console.log "ERROR".red, "Invalid move"
+            console.log "Player #{bot}".yellow
+            console.log error
+            process.exit 1
 
-    gameLoop()
+    console.log 
+    console.log "Game over!".red
+    console.log "Winner: #{who(game.winner())}"
+    game._print()
+    process.exit 0
 
 if program.norefresh
     simulate()
